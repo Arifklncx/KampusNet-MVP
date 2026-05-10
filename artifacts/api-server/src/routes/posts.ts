@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, postsTable, usersTable, likesTable, commentsTable } from "@workspace/db";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   GetPostsQueryParams,
@@ -12,6 +12,14 @@ import {
 
 const router = Router();
 
+async function getCount(table: typeof likesTable | typeof commentsTable, postId: number): Promise<number> {
+  const [row] = await db
+    .select({ value: sql<number>`COUNT(*)::int` })
+    .from(table)
+    .where(eq(table.postId, postId));
+  return row?.value ?? 0;
+}
+
 async function enrichPost(post: typeof postsTable.$inferSelect, viewerClerkId: string | null) {
   const author = await db
     .select()
@@ -21,12 +29,8 @@ async function enrichPost(post: typeof postsTable.$inferSelect, viewerClerkId: s
 
   const a = author[0];
 
-  const [likeRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM likes WHERE post_id = ${post.id}`
-  );
-  const [commentRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM comments WHERE post_id = ${post.id}`
-  );
+  const likeCount = await getCount(likesTable, post.id);
+  const commentCount = await getCount(commentsTable, post.id);
 
   let liked = false;
   if (viewerClerkId) {
@@ -47,8 +51,8 @@ async function enrichPost(post: typeof postsTable.$inferSelect, viewerClerkId: s
     authorUniversity: a?.university ?? "Unknown",
     authorDepartment: a?.department ?? "",
     authorAvatarUrl: a?.avatarUrl ?? null,
-    likeCount: parseInt(likeRow.count ?? "0", 10),
-    commentCount: parseInt(commentRow.count ?? "0", 10),
+    likeCount,
+    commentCount,
     liked,
     createdAt: post.createdAt.toISOString(),
   };
@@ -93,34 +97,33 @@ router.get("/", requireAuth, async (req, res) => {
       return;
     }
 
-    const allPosts = await db
+    posts = await db
       .select()
       .from(postsTable)
-      .where(sql`${postsTable.authorClerkId} = ANY(${sql.raw(`ARRAY[${clerkIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")}]`)})`)
+      .where(inArray(postsTable.authorClerkId, clerkIds))
       .orderBy(desc(postsTable.createdAt))
       .limit(limit!)
       .offset(offset!);
 
-    const [countRow] = await db.execute<{ count: string }>(
-      sql`SELECT COUNT(*) as count FROM posts WHERE author_clerk_id = ANY(${sql.raw(`ARRAY[${clerkIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")}]::text[]`)})`
-    );
+    const [countRow] = await db
+      .select({ value: sql<number>`COUNT(*)::int` })
+      .from(postsTable)
+      .where(inArray(postsTable.authorClerkId, clerkIds));
 
-    posts = allPosts;
-    total = parseInt(countRow.count ?? "0", 10);
+    total = countRow?.value ?? 0;
   } else {
-    const allPosts = await db
+    posts = await db
       .select()
       .from(postsTable)
       .orderBy(desc(postsTable.createdAt))
       .limit(limit!)
       .offset(offset!);
 
-    const [countRow] = await db.execute<{ count: string }>(
-      sql`SELECT COUNT(*) as count FROM posts`
-    );
+    const [countRow] = await db
+      .select({ value: sql<number>`COUNT(*)::int` })
+      .from(postsTable);
 
-    posts = allPosts;
-    total = parseInt(countRow.count ?? "0", 10);
+    total = countRow?.value ?? 0;
   }
 
   const enriched = await Promise.all(posts.map((p) => enrichPost(p, userId!)));

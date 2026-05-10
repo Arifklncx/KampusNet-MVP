@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, usersTable } from "@workspace/db";
-import { eq, count, sql } from "drizzle-orm";
+import { db, usersTable, postsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   UpsertMyProfileBody,
@@ -9,6 +9,14 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
+
+async function getPostCount(clerkId: string): Promise<number> {
+  const [row] = await db
+    .select({ value: sql<number>`COUNT(*)::int` })
+    .from(postsTable)
+    .where(eq(postsTable.authorClerkId, clerkId));
+  return row?.value ?? 0;
+}
 
 router.get("/me", requireAuth, async (req, res) => {
   const { userId } = getAuth(req);
@@ -25,13 +33,11 @@ router.get("/me", requireAuth, async (req, res) => {
   }
 
   const user = rows[0];
-  const [postCountRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM posts WHERE author_clerk_id = ${userId}`
-  );
+  const postCount = await getPostCount(userId!);
 
   res.json({
     ...user,
-    postCount: parseInt(postCountRow.count ?? "0", 10),
+    postCount,
     followerCount: 0,
     createdAt: user.createdAt.toISOString(),
   });
@@ -103,13 +109,11 @@ router.put("/me", requireAuth, async (req, res) => {
     user = updated[0];
   }
 
-  const [postCountRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM posts WHERE author_clerk_id = ${userId}`
-  );
+  const postCount = await getPostCount(userId!);
 
   res.json({
     ...user,
-    postCount: parseInt(postCountRow.count ?? "0", 10),
+    postCount,
     followerCount: 0,
     createdAt: user.createdAt.toISOString(),
   });
@@ -134,13 +138,11 @@ router.get("/:userId", async (req, res) => {
   }
 
   const user = rows[0];
-  const [postCountRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM posts WHERE author_clerk_id = ${parsed.data.userId}`
-  );
+  const postCount = await getPostCount(parsed.data.userId);
 
   res.json({
     ...user,
-    postCount: parseInt(postCountRow.count ?? "0", 10),
+    postCount,
     followerCount: 0,
     createdAt: user.createdAt.toISOString(),
   });

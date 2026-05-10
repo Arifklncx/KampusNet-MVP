@@ -1,30 +1,34 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, postsTable, usersTable, likesTable } from "@workspace/db";
+import { db, postsTable, usersTable, likesTable, commentsTable } from "@workspace/db";
 import { desc, sql, eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 
 router.get("/stats", requireAuth, async (req, res) => {
-  const [totalPostsRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM posts`
-  );
-  const [totalUsersRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM users`
-  );
-  const [totalUniversitiesRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(DISTINCT university) as count FROM users`
-  );
-  const [postsTodayRow] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM posts WHERE created_at >= NOW() - INTERVAL '24 hours'`
-  );
+  const [totalPostsRow] = await db
+    .select({ value: sql<number>`COUNT(*)::int` })
+    .from(postsTable);
+
+  const [totalUsersRow] = await db
+    .select({ value: sql<number>`COUNT(*)::int` })
+    .from(usersTable);
+
+  const [totalUniversitiesRow] = await db
+    .select({ value: sql<number>`COUNT(DISTINCT university)::int` })
+    .from(usersTable);
+
+  const [postsTodayRow] = await db
+    .select({ value: sql<number>`COUNT(*)::int` })
+    .from(postsTable)
+    .where(sql`${postsTable.createdAt} >= NOW() - INTERVAL '24 hours'`);
 
   res.json({
-    totalPosts: parseInt(totalPostsRow.count ?? "0", 10),
-    totalUsers: parseInt(totalUsersRow.count ?? "0", 10),
-    totalUniversities: parseInt(totalUniversitiesRow.count ?? "0", 10),
-    postsToday: parseInt(postsTodayRow.count ?? "0", 10),
+    totalPosts: totalPostsRow?.value ?? 0,
+    totalUsers: totalUsersRow?.value ?? 0,
+    totalUniversities: totalUniversitiesRow?.value ?? 0,
+    postsToday: postsTodayRow?.value ?? 0,
   });
 });
 
@@ -32,7 +36,7 @@ router.get("/trending", requireAuth, async (req, res) => {
   const { userId } = getAuth(req);
 
   const trendingPosts = await db
-    .select({ post: postsTable, likeCount: sql<number>`COUNT(likes.post_id)` })
+    .select({ post: postsTable, likeCount: sql<number>`COUNT(likes.post_id)::int` })
     .from(postsTable)
     .leftJoin(likesTable, and(
       eq(likesTable.postId, postsTable.id),
@@ -44,7 +48,7 @@ router.get("/trending", requireAuth, async (req, res) => {
     .limit(10);
 
   const enriched = await Promise.all(
-    trendingPosts.map(async ({ post }) => {
+    trendingPosts.map(async ({ post, likeCount }) => {
       const author = await db
         .select()
         .from(usersTable)
@@ -52,12 +56,10 @@ router.get("/trending", requireAuth, async (req, res) => {
         .limit(1);
       const a = author[0];
 
-      const [likeRow] = await db.execute<{ count: string }>(
-        sql`SELECT COUNT(*) as count FROM likes WHERE post_id = ${post.id}`
-      );
-      const [commentRow] = await db.execute<{ count: string }>(
-        sql`SELECT COUNT(*) as count FROM comments WHERE post_id = ${post.id}`
-      );
+      const [commentRow] = await db
+        .select({ value: sql<number>`COUNT(*)::int` })
+        .from(commentsTable)
+        .where(eq(commentsTable.postId, post.id));
 
       let liked = false;
       if (userId) {
@@ -78,8 +80,8 @@ router.get("/trending", requireAuth, async (req, res) => {
         authorUniversity: a?.university ?? "Unknown",
         authorDepartment: a?.department ?? "",
         authorAvatarUrl: a?.avatarUrl ?? null,
-        likeCount: parseInt(likeRow.count ?? "0", 10),
-        commentCount: parseInt(commentRow.count ?? "0", 10),
+        likeCount: likeCount ?? 0,
+        commentCount: commentRow?.value ?? 0,
         liked,
         createdAt: post.createdAt.toISOString(),
       };
