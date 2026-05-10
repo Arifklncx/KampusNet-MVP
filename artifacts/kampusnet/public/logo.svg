@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Shield Background -->
+  <path d="M50 10 L85 25 V50 C85 75 50 95 50 95 C50 95 15 75 15 50 V25 L50 10 Z" fill="#2E5CFF" />
+  
+  <!-- Stylized K -->
+  <path d="M35 35 V65" stroke="white" stroke-width="8" stroke-linecap="round" />
+  <path d="M65 35 L40 50" stroke="white" stroke-width="8" stroke-linecap="round" />
+  <path d="M40 50 L65 65" stroke="white" stroke-width="8" stroke-linecap="round" />
+</svg>
