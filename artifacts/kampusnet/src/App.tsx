@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
@@ -11,6 +11,7 @@ import Feed from "@/pages/feed";
 import Onboarding from "@/pages/onboarding";
 import Profile from "@/pages/profile";
 import UserProfile from "@/pages/user-profile";
+import { useGetMyProfile, getGetMyProfileQueryKey } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -54,27 +55,27 @@ const clerkAppearance = {
     cardBox: "bg-white rounded-2xl w-[440px] max-w-full overflow-hidden shadow-xl border border-border",
     card: "!shadow-none !border-0 !bg-transparent !rounded-none",
     footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-foreground font-bold",
+    headerTitle: "text-foreground font-bold text-xl",
     headerSubtitle: "text-muted-foreground",
-    socialButtonsBlockButtonText: "text-foreground",
-    formFieldLabel: "text-foreground font-medium",
-    footerActionLink: "text-primary font-medium",
+    socialButtonsBlockButtonText: "text-foreground font-medium",
+    formFieldLabel: "text-foreground font-medium text-sm",
+    footerActionLink: "text-primary font-semibold",
     footerActionText: "text-muted-foreground",
-    dividerText: "text-muted-foreground",
+    dividerText: "text-muted-foreground text-xs",
     identityPreviewEditButton: "text-primary",
     formFieldSuccessText: "text-green-600",
-    alertText: "text-destructive",
-    logoBox: "flex justify-center mb-2",
+    alertText: "text-destructive text-sm",
+    logoBox: "flex justify-center mb-1",
     logoImage: "h-10 w-10",
-    socialButtonsBlockButton: "border border-border bg-card hover:bg-muted transition-colors",
+    socialButtonsBlockButton: "border border-border bg-card hover:bg-muted/80 transition-colors text-sm",
     formButtonPrimary: "bg-primary text-primary-foreground hover:opacity-90 transition-opacity font-semibold",
-    formFieldInput: "bg-muted border-input text-foreground placeholder:text-muted-foreground",
+    formFieldInput: "bg-muted border-input text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring",
     footerAction: "border-t border-border",
     dividerLine: "border-border",
-    alert: "bg-destructive/10 border border-destructive/20",
+    alert: "bg-destructive/10 border border-destructive/20 rounded-lg",
     otpCodeFieldInput: "border-input bg-muted text-foreground",
     formFieldRow: "gap-3",
-    main: "gap-4",
+    main: "gap-5",
   },
 };
 
@@ -99,24 +100,48 @@ function ClerkQueryClientCacheInvalidator() {
 
 function SignInPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-primary/5 to-accent px-4">
-      <SignIn
-        routing="path"
-        path={`${basePath}/sign-in`}
-        signUpUrl={`${basePath}/sign-up`}
-      />
+    <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/40 px-4 py-8">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <p className="text-sm text-muted-foreground">
+            Sadece{" "}
+            <span className="font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              .edu.tr
+            </span>{" "}
+            e-posta adresiyle giriş yapabilirsin
+          </p>
+        </div>
+        <SignIn
+          routing="path"
+          path={`${basePath}/sign-in`}
+          signUpUrl={`${basePath}/sign-up`}
+          forceRedirectUrl={`${basePath}/feed`}
+        />
+      </div>
     </div>
   );
 }
 
 function SignUpPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-primary/5 to-accent px-4">
-      <SignUp
-        routing="path"
-        path={`${basePath}/sign-up`}
-        signInUrl={`${basePath}/sign-in`}
-      />
+    <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/40 px-4 py-8">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <p className="text-sm text-muted-foreground">
+            Sadece{" "}
+            <span className="font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              .edu.tr
+            </span>{" "}
+            uzantılı üniversite e-postanla kayıt olabilirsin
+          </p>
+        </div>
+        <SignUp
+          routing="path"
+          path={`${basePath}/sign-up`}
+          signInUrl={`${basePath}/sign-in`}
+          forceRedirectUrl={`${basePath}/onboarding`}
+        />
+      </div>
     </div>
   );
 }
@@ -134,17 +159,61 @@ function HomeRoute() {
   );
 }
 
-function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
+/**
+ * Guards a route so that:
+ * - Signed-out users → redirect to /
+ * - Signed-in users with no profile → redirect to /onboarding (unless already there)
+ * - Signed-in users with profile → render children
+ */
+function AuthGuard({
+  component: Component,
+  requireProfile = true,
+}: {
+  component: () => ReactNode;
+  requireProfile?: boolean;
+}) {
   return (
     <>
-      <Show when="signed-in">
-        <Component />
-      </Show>
       <Show when="signed-out">
         <Redirect to="/" />
       </Show>
+      <Show when="signed-in">
+        {requireProfile ? <ProfileCheckWrapper component={Component} /> : <Component />}
+      </Show>
     </>
   );
+}
+
+function ProfileCheckWrapper({ component: Component }: { component: () => ReactNode }) {
+  const [, setLocation] = useLocation();
+  const { data: profile, isLoading, isError } = useGetMyProfile({
+    query: {
+      queryKey: getGetMyProfileQueryKey(),
+      retry: false,
+    },
+  });
+
+  useEffect(() => {
+    // 404 means no profile yet — send to onboarding
+    if (isError) {
+      setLocation("/onboarding");
+    }
+  }, [isError, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-[3px] border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Yükleniyor…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) return null;
+
+  return <Component />;
 }
 
 function ClerkProviderWithRoutes() {
@@ -167,7 +236,7 @@ function ClerkProviderWithRoutes() {
         signUp: {
           start: {
             title: "Kampüsnet'e Katıl",
-            subtitle: "Sadece .edu.tr e-postanla kayıt ol",
+            subtitle: "Üniversite e-postanla ücretsiz kayıt ol",
           },
         },
       }}
@@ -181,16 +250,16 @@ function ClerkProviderWithRoutes() {
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/onboarding">
-            <ProtectedRoute component={Onboarding} />
+            <AuthGuard component={Onboarding} requireProfile={false} />
           </Route>
           <Route path="/feed">
-            <ProtectedRoute component={Feed} />
+            <AuthGuard component={Feed} requireProfile={true} />
           </Route>
           <Route path="/profile">
-            <ProtectedRoute component={Profile} />
+            <AuthGuard component={Profile} requireProfile={true} />
           </Route>
           <Route path="/profile/:userId">
-            <ProtectedRoute component={UserProfile} />
+            <AuthGuard component={UserProfile} requireProfile={true} />
           </Route>
           <Route component={NotFound} />
         </Switch>
