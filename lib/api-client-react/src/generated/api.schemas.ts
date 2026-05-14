@@ -136,6 +136,11 @@ export interface NotificationItem {
   createdAt: string;
 }
 
+export interface TrendingHashtag {
+  tag: string;
+  count: number;
+}
+
 export interface NotificationsResponse {
   notifications: NotificationItem[];
   unreadCount: number;

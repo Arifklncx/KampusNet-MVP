@@ -328,6 +328,23 @@ paths:
         "401":
           description: Unauthorized
 
+  /feed/hashtags:
+    get:
+      operationId: getTrendingHashtags
+      tags: [feed]
+      summary: Get trending hashtags from recent posts
+      responses:
+        "200":
+          description: List of trending hashtags with counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendingHashtag"
+        "401":
+          description: Unauthorized
+
   /search:
     get:
       operationId: search
@@ -632,6 +649,15 @@ components:
           type: boolean
         createdAt:
           type: string
+
+    TrendingHashtag:
+      type: object
+      required: [tag, count]
+      properties:
+        tag:
+          type: string
+        count:
+          type: integer
 
     NotificationsResponse:
       type: object

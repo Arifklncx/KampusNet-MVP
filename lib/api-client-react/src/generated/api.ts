@@ -31,6 +31,7 @@ import type {
   PostsPage,
   SearchParams,
   SearchResult,
+  TrendingHashtag,
   UserProfile,
   UserProfileInput,
 } from "./api.schemas";
@@ -1277,6 +1278,81 @@ export function useGetTrendingPosts<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetTrendingPostsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get trending hashtags from recent posts
+ */
+export const getGetTrendingHashtagsUrl = () => {
+  return `/api/feed/hashtags`;
+};
+
+export const getTrendingHashtags = async (
+  options?: RequestInit,
+): Promise<TrendingHashtag[]> => {
+  return customFetch<TrendingHashtag[]>(getGetTrendingHashtagsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTrendingHashtagsQueryKey = () => {
+  return [`/api/feed/hashtags`] as const;
+};
+
+export const getGetTrendingHashtagsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTrendingHashtags>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTrendingHashtags>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetTrendingHashtagsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTrendingHashtags>>
+  > = ({ signal }) => getTrendingHashtags({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTrendingHashtags>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTrendingHashtagsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTrendingHashtags>>
+>;
+export type GetTrendingHashtagsQueryError = ErrorType<void>;
+
+/**
+ * @summary Get trending hashtags from recent posts
+ */
+
+export function useGetTrendingHashtags<
+  TData = Awaited<ReturnType<typeof getTrendingHashtags>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTrendingHashtags>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTrendingHashtagsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

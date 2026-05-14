@@ -17,12 +17,14 @@ import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
   useSearch,
+  useGetTrendingHashtags,
   getGetPostsQueryKey,
   getGetFeedStatsQueryKey,
   getGetTrendingPostsQueryKey,
   getGetCommentsQueryKey,
   getGetMyProfileQueryKey,
   getGetNotificationsQueryKey,
+  getGetTrendingHashtagsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -871,10 +873,91 @@ function PostSkeleton() {
   );
 }
 
+/* ─── Trending Hashtags Sidebar ─── */
+function TrendingHashtagsSidebar({
+  activeTag,
+  onTagClick,
+}: {
+  activeTag: string | null;
+  onTagClick: (tag: string) => void;
+}) {
+  const { data: hashtags, isLoading } = useGetTrendingHashtags({
+    query: { queryKey: getGetTrendingHashtagsQueryKey(), staleTime: 60_000 },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-card border border-border rounded-xl p-4">
+        <div className="h-3 bg-muted rounded w-2/3 mb-4 animate-pulse" />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between py-2">
+            <div className="h-2.5 bg-muted rounded w-1/2 animate-pulse" />
+            <div className="h-2.5 bg-muted rounded w-8 animate-pulse" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!hashtags || hashtags.length === 0) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: "14px", height: "14px" }} className="text-primary">
+          <line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" />
+          <line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" />
+        </svg>
+        <span className="text-xs font-semibold text-foreground uppercase tracking-wide">Trend Konular</span>
+      </div>
+      <div className="divide-y divide-border">
+        {hashtags.map((h, i) => {
+          const active = activeTag === h.tag;
+          return (
+            <button
+              key={h.tag}
+              onClick={() => onTagClick(h.tag)}
+              data-testid={`hashtag-${h.tag}`}
+              className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors group ${
+                active
+                  ? "bg-primary/8 text-primary"
+                  : "hover:bg-muted/60 text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-muted-foreground text-xs w-4 text-right flex-shrink-0">{i + 1}</span>
+                <span className={`text-sm font-semibold truncate ${active ? "text-primary" : "group-hover:text-primary transition-colors"}`}>
+                  #{h.tag}
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                {h.count} {h.count === 1 ? "gönderi" : "gönderi"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {activeTag && (
+        <div className="px-4 py-2.5 border-t border-border">
+          <button
+            onClick={() => onTagClick(activeTag)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            data-testid="clear-hashtag-filter"
+          >
+            <XIcon />
+            Filtreyi temizle
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Feed Page ─── */
 export default function Feed() {
   const { user } = useUser();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [hashtagFilter, setHashtagFilter] = useState<string | null>(null);
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -886,6 +969,17 @@ export default function Feed() {
   const { data: trending } = useGetTrendingPosts({
     query: { queryKey: getGetTrendingPostsQueryKey() },
   });
+
+  function handleHashtagClick(tag: string) {
+    setHashtagFilter((prev) => (prev === tag ? null : tag));
+  }
+
+  const allPosts = postsData?.posts ?? [];
+  const filteredPosts = hashtagFilter
+    ? allPosts.filter((p) =>
+        new RegExp(`#${hashtagFilter}(?![a-zA-ZğüşıöçĞÜŞİÖÇ0-9_])`, "i").test(p.content)
+      )
+    : allPosts;
 
   const likePost = useLikePost();
   const unlikePost = useUnlikePost();
@@ -946,79 +1040,122 @@ export default function Feed() {
         avatarUrl={myProfile?.avatarUrl}
       />
 
-      <div className="max-w-2xl mx-auto px-4 py-5">
-        <StatsBar />
-        <CreatePost />
+      <div className="max-w-4xl mx-auto px-4 py-5">
+        <div className="flex gap-6 items-start">
 
-        <FilterToggle
-          filter={filter}
-          onChange={setFilter}
-          campusName={myProfile?.university}
-        />
+          {/* ── Main feed column ── */}
+          <div className="flex-1 min-w-0">
+            <StatsBar />
+            <CreatePost />
 
-        {/* My campus banner when filtered */}
-        {filter === "my_university" && myProfile?.university && (
-          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-primary/5 rounded-lg border border-primary/15 text-sm">
-            <BuildingIcon />
-            <span className="text-primary font-medium">{myProfile.university}</span>
-            <span className="text-muted-foreground ml-auto text-xs">kampüs görünümü</span>
-          </div>
-        )}
+            <FilterToggle
+              filter={filter}
+              onChange={setFilter}
+              campusName={myProfile?.university}
+            />
 
-        {/* Trending strip */}
-        {trending && trending.length > 0 && filter === "all" && (
-          <div className="mb-4">
-            <div className="flex items-center gap-1.5 mb-2">
-              <TrendingIcon />
-              <span className="text-xs font-semibold text-foreground uppercase tracking-wide">Trend</span>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-              {trending.slice(0, 5).map((p) => (
-                <div key={p.id} className="flex-shrink-0 w-44 bg-card border border-border rounded-xl p-3 hover:border-primary/30 transition-colors cursor-default">
-                  <p className="text-xs text-foreground line-clamp-2 mb-2 leading-relaxed">{p.content}</p>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-red-500 font-semibold">♥ {p.likeCount}</span>
-                    <span className="text-xs text-muted-foreground">· {p.authorUniversity.split(" ")[0]}</span>
-                  </div>
+            {/* Hashtag filter banner */}
+            {hashtagFilter && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-primary/5 rounded-lg border border-primary/15 text-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: "14px", height: "14px" }} className="text-primary flex-shrink-0">
+                  <line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" />
+                  <line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" />
+                </svg>
+                <span className="text-primary font-semibold">#{hashtagFilter}</span>
+                <span className="text-muted-foreground text-xs">
+                  — {filteredPosts.length} gönderi
+                </span>
+                <button
+                  onClick={() => setHashtagFilter(null)}
+                  className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="clear-hashtag-filter-banner"
+                  aria-label="Filtreyi temizle"
+                >
+                  <XIcon />
+                </button>
+              </div>
+            )}
+
+            {/* My campus banner when filtered */}
+            {!hashtagFilter && filter === "my_university" && myProfile?.university && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-primary/5 rounded-lg border border-primary/15 text-sm">
+                <BuildingIcon />
+                <span className="text-primary font-medium">{myProfile.university}</span>
+                <span className="text-muted-foreground ml-auto text-xs">kampüs görünümü</span>
+              </div>
+            )}
+
+            {/* Trending strip (only when no hashtag filter active) */}
+            {!hashtagFilter && trending && trending.length > 0 && filter === "all" && (
+              <div className="mb-4">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <TrendingIcon />
+                  <span className="text-xs font-semibold text-foreground uppercase tracking-wide">Trend</span>
                 </div>
-              ))}
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {trending.slice(0, 5).map((p) => (
+                    <div key={p.id} className="flex-shrink-0 w-44 bg-card border border-border rounded-xl p-3 hover:border-primary/30 transition-colors cursor-default">
+                      <p className="text-xs text-foreground line-clamp-2 mb-2 leading-relaxed">{p.content}</p>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-red-500 font-semibold">♥ {p.likeCount}</span>
+                        <span className="text-xs text-muted-foreground">· {p.authorUniversity.split(" ")[0]}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Posts list */}
+            <div className="space-y-3">
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />)
+              ) : filteredPosts.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground animate-fade-in-up" data-testid="empty-feed">
+                  <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                    <CommentIcon />
+                  </div>
+                  <p className="font-semibold text-foreground">
+                    {hashtagFilter ? `#${hashtagFilter} etiketiyle gönderi yok` : "Henüz gönderi yok"}
+                  </p>
+                  <p className="text-sm mt-1">
+                    {hashtagFilter
+                      ? "Bu konuda henüz bir şey paylaşılmamış."
+                      : filter === "my_university"
+                      ? "Kampüsünden henüz paylaşım yok. İlk sen paylaş!"
+                      : "İlk paylaşımı sen yap!"}
+                  </p>
+                </div>
+              ) : (
+                filteredPosts.map((post, i) => (
+                  <div
+                    key={post.id}
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: `${Math.min(i * 40, 160)}ms`, animationFillMode: "both", opacity: 0 }}
+                  >
+                    <PostCard
+                      post={{ ...post, authorDepartment: post.authorDepartment ?? "" }}
+                      currentUserId={currentUserId}
+                      onLike={handleLike}
+                      onUnlike={handleUnlike}
+                      onDelete={handleDelete}
+                    />
+                  </div>
+                ))
+              )}
             </div>
           </div>
-        )}
 
-        {/* Posts list */}
-        <div className="space-y-3">
-          {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />)
-          ) : postsData?.posts?.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground animate-fade-in-up" data-testid="empty-feed">
-              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                <CommentIcon />
-              </div>
-              <p className="font-semibold text-foreground">Henüz gönderi yok</p>
-              <p className="text-sm mt-1">
-                {filter === "my_university"
-                  ? "Kampüsünden henüz paylaşım yok. İlk sen paylaş!"
-                  : "İlk paylaşımı sen yap!"}
-              </p>
+          {/* ── Sidebar ── */}
+          <aside className="hidden lg:block w-60 flex-shrink-0">
+            <div className="sticky top-20 space-y-4">
+              <TrendingHashtagsSidebar
+                activeTag={hashtagFilter}
+                onTagClick={handleHashtagClick}
+              />
             </div>
-          ) : (
-            postsData?.posts?.map((post, i) => (
-              <div
-                key={post.id}
-                className="animate-fade-in-up"
-                style={{ animationDelay: `${Math.min(i * 40, 160)}ms`, animationFillMode: "both", opacity: 0 }}
-              >
-                <PostCard
-                  post={{ ...post, authorDepartment: post.authorDepartment ?? "" }}
-                  currentUserId={currentUserId}
-                  onLike={handleLike}
-                  onUnlike={handleUnlike}
-                  onDelete={handleDelete}
-                />
-              </div>
-            ))
-          )}
+          </aside>
+
         </div>
       </div>
     </div>

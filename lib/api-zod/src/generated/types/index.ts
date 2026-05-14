@@ -22,6 +22,7 @@ export * from "./postInput";
 export * from "./postsPage";
 export * from "./searchParams";
 export * from "./searchResult";
+export * from "./trendingHashtag";
 export * from "./userProfile";
 export * from "./userProfileInput";
 export * from "./userSummary";

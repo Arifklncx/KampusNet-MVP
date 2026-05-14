@@ -256,6 +256,17 @@ export const GetTrendingPostsResponseItem = zod.object({
 export const GetTrendingPostsResponse = zod.array(GetTrendingPostsResponseItem);
 
 /**
+ * @summary Get trending hashtags from recent posts
+ */
+export const GetTrendingHashtagsResponseItem = zod.object({
+  tag: zod.string(),
+  count: zod.number(),
+});
+export const GetTrendingHashtagsResponse = zod.array(
+  GetTrendingHashtagsResponseItem,
+);
+
+/**
  * @summary Search posts and users
  */
 

@@ -91,4 +91,27 @@ router.get("/trending", requireAuth, async (req, res) => {
   res.json(enriched);
 });
 
+router.get("/hashtags", requireAuth, async (req, res) => {
+  const posts = await db.select({ content: postsTable.content }).from(postsTable);
+  const counts: Record<string, number> = {};
+  const tagRegex = /#([a-zA-ZğüşıöçĞÜŞİÖÇ0-9_]{2,})/g;
+  for (const { content } of posts) {
+    const seen = new Set<string>();
+    tagRegex.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = tagRegex.exec(content)) !== null) {
+      const tag = m[1].toLowerCase();
+      if (!seen.has(tag)) {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+        seen.add(tag);
+      }
+    }
+  }
+  const result = Object.entries(counts)
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 15);
+  res.json(result);
+});
+
 export default router;
