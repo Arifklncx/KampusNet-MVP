@@ -560,16 +560,38 @@ export default function Feed() {
 
   const currentUserId = user?.id ?? "";
 
+  type PostsData = { posts: typeof postsData extends { posts: infer P } | undefined ? P : never; total: number };
+
+  function patchPost(postId: number, patch: (p: PostsData["posts"][number]) => PostsData["posts"][number]) {
+    const activeKey = getGetPostsQueryKey({ filter, limit: 30, offset: 0 });
+    qc.setQueryData<PostsData>(activeKey, (old) => {
+      if (!old) return old;
+      return { ...old, posts: old.posts.map((p) => (p.id === postId ? patch(p) : p)) };
+    });
+  }
+
   async function handleLike(postId: number) {
-    await likePost.mutateAsync({ postId });
-    qc.invalidateQueries({ queryKey: getGetPostsQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetTrendingPostsQueryKey() });
+    patchPost(postId, (p) => ({ ...p, liked: true, likeCount: p.likeCount + 1 }));
+    try {
+      await likePost.mutateAsync({ postId });
+    } catch {
+      patchPost(postId, (p) => ({ ...p, liked: false, likeCount: Math.max(0, p.likeCount - 1) }));
+    } finally {
+      qc.invalidateQueries({ queryKey: getGetPostsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetTrendingPostsQueryKey() });
+    }
   }
 
   async function handleUnlike(postId: number) {
-    await unlikePost.mutateAsync({ postId });
-    qc.invalidateQueries({ queryKey: getGetPostsQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetTrendingPostsQueryKey() });
+    patchPost(postId, (p) => ({ ...p, liked: false, likeCount: Math.max(0, p.likeCount - 1) }));
+    try {
+      await unlikePost.mutateAsync({ postId });
+    } catch {
+      patchPost(postId, (p) => ({ ...p, liked: true, likeCount: p.likeCount + 1 }));
+    } finally {
+      qc.invalidateQueries({ queryKey: getGetPostsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetTrendingPostsQueryKey() });
+    }
   }
 
   async function handleDelete(postId: number) {

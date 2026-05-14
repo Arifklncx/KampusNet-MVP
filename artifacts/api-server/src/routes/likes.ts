@@ -6,6 +6,14 @@ import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router({ mergeParams: true });
 
+async function getLikeCount(postId: number): Promise<number> {
+  const [row] = await db
+    .select({ value: sql<number>`COUNT(*)::int` })
+    .from(likesTable)
+    .where(eq(likesTable.postId, postId));
+  return row?.value ?? 0;
+}
+
 router.post("/", requireAuth, async (req, res) => {
   const { userId } = getAuth(req);
   const postId = Number(req.params.postId);
@@ -31,11 +39,8 @@ router.post("/", requireAuth, async (req, res) => {
     .values({ postId, userClerkId: userId! })
     .onConflictDoNothing();
 
-  const [row] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM likes WHERE post_id = ${postId}`
-  );
-
-  res.json({ liked: true, likeCount: parseInt(row.count ?? "0", 10) });
+  const likeCount = await getLikeCount(postId);
+  res.json({ liked: true, likeCount });
 });
 
 router.delete("/", requireAuth, async (req, res) => {
@@ -51,11 +56,8 @@ router.delete("/", requireAuth, async (req, res) => {
     .delete(likesTable)
     .where(and(eq(likesTable.postId, postId), eq(likesTable.userClerkId, userId!)));
 
-  const [row] = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) as count FROM likes WHERE post_id = ${postId}`
-  );
-
-  res.json({ liked: false, likeCount: parseInt(row.count ?? "0", 10) });
+  const likeCount = await getLikeCount(postId);
+  res.json({ liked: false, likeCount });
 });
 
 export default router;
