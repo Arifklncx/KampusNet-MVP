@@ -108,6 +108,21 @@ export interface FeedStats {
   postsToday: number;
 }
 
+export interface UserSummary {
+  clerkId: string;
+  firstName: string;
+  lastName: string;
+  university: string;
+  department: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+}
+
+export interface SearchResult {
+  posts: Post[];
+  users: UserSummary[];
+}
+
 export interface NotificationItem {
   id: number;
   type: string;
@@ -142,6 +157,13 @@ export const GetPostsFilter = {
   all: "all",
   my_university: "my_university",
 } as const;
+
+export type SearchParams = {
+  /**
+   * @minLength 1
+   */
+  q: string;
+};
 
 export type MarkAllNotificationsRead200 = {
   success?: boolean;

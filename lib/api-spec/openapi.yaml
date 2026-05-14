@@ -328,6 +328,30 @@ paths:
         "401":
           description: Unauthorized
 
+  /search:
+    get:
+      operationId: search
+      tags: [feed]
+      summary: Search posts and users
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResult"
+        "400":
+          description: Missing query
+        "401":
+          description: Unauthorized
+
   /notifications:
     get:
       operationId: getNotifications
@@ -555,6 +579,36 @@ components:
           type: integer
         postsToday:
           type: integer
+
+    UserSummary:
+      type: object
+      required: [clerkId, firstName, lastName, university, department]
+      properties:
+        clerkId:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        university:
+          type: string
+        department:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+
+    SearchResult:
+      type: object
+      required: [posts, users]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
 
     NotificationItem:
       type: object

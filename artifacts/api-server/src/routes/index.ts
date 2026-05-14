@@ -5,6 +5,7 @@ import postsRouter from "./posts";
 import likesRouter from "./likes";
 import feedRouter from "./feed";
 import notificationsRouter from "./notifications";
+import searchRouter from "./search";
 import { commentsRouter, singleCommentRouter } from "./comments";
 
 const router: IRouter = Router();
@@ -17,5 +18,6 @@ router.use("/posts/:postId/comments", commentsRouter);
 router.use("/comments", singleCommentRouter);
 router.use("/feed", feedRouter);
 router.use("/notifications", notificationsRouter);
+router.use("/search", searchRouter);
 
 export default router;

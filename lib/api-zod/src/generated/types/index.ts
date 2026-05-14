@@ -20,5 +20,8 @@ export * from "./notificationsResponse";
 export * from "./post";
 export * from "./postInput";
 export * from "./postsPage";
+export * from "./searchParams";
+export * from "./searchResult";
 export * from "./userProfile";
 export * from "./userProfileInput";
+export * from "./userSummary";

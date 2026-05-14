@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import {
@@ -16,6 +16,7 @@ import {
   useGetNotifications,
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
+  useSearch,
   getGetPostsQueryKey,
   getGetFeedStatsQueryKey,
   getGetTrendingPostsQueryKey,
@@ -72,6 +73,23 @@ function CommentIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "18px", height: "18px" }}>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "16px", height: "16px" }}>
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
 function BellIcon({ filled }: { filled?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" style={{ width: "18px", height: "18px" }}>
@@ -97,6 +115,180 @@ function ImageIcon() {
       <circle cx="8.5" cy="8.5" r="1.5" />
       <polyline points="21 15 16 10 5 21" />
     </svg>
+  );
+}
+
+/* ─── Search Overlay ─── */
+function SearchOverlay({ onClose }: { onClose: () => void }) {
+  const [, setLocation] = useLocation();
+  const [input, setInput] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQ(input.trim()), 320);
+    return () => clearTimeout(timer);
+  }, [input]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const enabled = debouncedQ.length >= 2;
+
+  const { data, isFetching } = useSearch(
+    { q: debouncedQ },
+    { query: { enabled, staleTime: 10_000 } }
+  );
+
+  const users = data?.users ?? [];
+  const posts = data?.posts ?? [];
+  const hasResults = users.length > 0 || posts.length > 0;
+  const showEmpty = enabled && !isFetching && !hasResults;
+
+  function goToUser(clerkId: string) {
+    setLocation(`/profile/${clerkId}`);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      {/* Dimmed backdrop */}
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Search panel */}
+      <div className="relative z-10 max-w-2xl w-full mx-auto mt-16 px-4">
+        {/* Input row */}
+        <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-4 py-3 shadow-xl">
+          <span className="text-muted-foreground flex-shrink-0">
+            <SearchIcon />
+          </span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Gönderi veya öğrenci ara…"
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+            data-testid="input-search"
+          />
+          {input && (
+            <button onClick={() => setInput("")} className="text-muted-foreground hover:text-foreground flex-shrink-0">
+              <XIcon />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-xs text-muted-foreground hover:text-foreground ml-1 font-medium flex-shrink-0"
+          >
+            İptal
+          </button>
+        </div>
+
+        {/* Results panel */}
+        {(enabled || isFetching) && (
+          <div className="mt-2 bg-card border border-border rounded-xl shadow-xl overflow-hidden max-h-[60vh] overflow-y-auto">
+            {isFetching && (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
+            {showEmpty && (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                "<span className="font-medium text-foreground">{debouncedQ}</span>" için sonuç bulunamadı
+              </div>
+            )}
+
+            {!isFetching && hasResults && (
+              <>
+                {users.length > 0 && (
+                  <div>
+                    <div className="px-4 pt-3 pb-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Öğrenciler</span>
+                    </div>
+                    {users.map((u) => (
+                      <button
+                        key={u.clerkId}
+                        onClick={() => goToUser(u.clerkId)}
+                        data-testid={`search-user-${u.clerkId}`}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors text-left"
+                      >
+                        <Avatar className="w-8 h-8 flex-shrink-0">
+                          <AvatarImage src={u.avatarUrl ?? undefined} />
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
+                            {u.firstName[0]}{u.lastName[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">
+                            {u.firstName} {u.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {u.university} · {u.department}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {posts.length > 0 && (
+                  <div className={users.length > 0 ? "border-t border-border" : ""}>
+                    <div className="px-4 pt-3 pb-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Gönderiler</span>
+                    </div>
+                    {posts.map((p) => (
+                      <div
+                        key={p.id}
+                        data-testid={`search-post-${p.id}`}
+                        className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors cursor-default"
+                      >
+                        <Avatar className="w-7 h-7 flex-shrink-0 mt-0.5">
+                          <AvatarImage src={p.authorAvatarUrl ?? undefined} />
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
+                            {p.authorName.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <button
+                              onClick={() => goToUser(p.authorId)}
+                              className="text-xs font-semibold text-foreground hover:text-primary transition-colors truncate"
+                            >
+                              {p.authorName}
+                            </button>
+                            <Badge className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-0 font-medium flex-shrink-0">
+                              {p.authorUniversity}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-foreground/90 leading-snug line-clamp-2 break-words">{p.content}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-xs text-muted-foreground">❤️ {p.likeCount}</span>
+                            <span className="text-xs text-muted-foreground">💬 {p.commentCount}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(p.createdAt), { addSuffix: true, locale: tr })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -219,43 +411,55 @@ function NotificationBell() {
 function Navbar({ firstName, lastName, avatarUrl }: { firstName: string; lastName: string; avatarUrl?: string | null }) {
   const [, setLocation] = useLocation();
   const { signOut } = useClerk();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm">
-      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-        <button onClick={() => setLocation("/feed")} className="flex items-center gap-2.5" data-testid="link-logo">
-          <img src={`${basePath}/logo.svg`} alt="Kampüsnet" className="w-7 h-7" />
-          <span className="font-bold text-lg text-primary">Kampüsnet</span>
-        </button>
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          <button
-            onClick={() => setLocation("/profile")}
-            data-testid="link-profile"
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
-          >
-            <Avatar className="w-7 h-7">
-              <AvatarImage src={avatarUrl ?? undefined} />
-              <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
-                {firstName ? `${firstName[0]}${lastName[0]}` : "?"}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-medium text-foreground hidden sm:block">
-              {firstName} {lastName}
-            </span>
+    <>
+      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
+      <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+          <button onClick={() => setLocation("/feed")} className="flex items-center gap-2.5" data-testid="link-logo">
+            <img src={`${basePath}/logo.svg`} alt="Kampüsnet" className="w-7 h-7" />
+            <span className="font-bold text-lg text-primary">Kampüsnet</span>
           </button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => signOut()}
-            data-testid="button-sign-out"
-            className="text-muted-foreground hover:text-destructive text-sm"
-          >
-            Çıkış
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSearchOpen(true)}
+              data-testid="button-open-search"
+              className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label="Ara"
+            >
+              <SearchIcon />
+            </button>
+            <NotificationBell />
+            <button
+              onClick={() => setLocation("/profile")}
+              data-testid="link-profile"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
+            >
+              <Avatar className="w-7 h-7">
+                <AvatarImage src={avatarUrl ?? undefined} />
+                <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
+                  {firstName ? `${firstName[0]}${lastName[0]}` : "?"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-medium text-foreground hidden sm:block">
+                {firstName} {lastName}
+              </span>
+            </button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => signOut()}
+              data-testid="button-sign-out"
+              className="text-muted-foreground hover:text-destructive text-sm"
+            >
+              Çıkış
+            </Button>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
 

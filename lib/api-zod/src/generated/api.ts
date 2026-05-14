@@ -256,6 +256,43 @@ export const GetTrendingPostsResponseItem = zod.object({
 export const GetTrendingPostsResponse = zod.array(GetTrendingPostsResponseItem);
 
 /**
+ * @summary Search posts and users
+ */
+
+export const SearchQueryParams = zod.object({
+  q: zod.coerce.string().min(1),
+});
+
+export const SearchResponse = zod.object({
+  posts: zod.array(
+    zod.object({
+      id: zod.number(),
+      content: zod.string(),
+      imageUrl: zod.string().nullish(),
+      authorId: zod.string(),
+      authorName: zod.string(),
+      authorUniversity: zod.string(),
+      authorDepartment: zod.string().optional(),
+      authorAvatarUrl: zod.string().nullish(),
+      likeCount: zod.number(),
+      commentCount: zod.number(),
+      liked: zod.boolean(),
+      createdAt: zod.string(),
+    }),
+  ),
+  users: zod.array(
+    zod.object({
+      clerkId: zod.string(),
+      firstName: zod.string(),
+      lastName: zod.string(),
+      university: zod.string(),
+      department: zod.string(),
+      avatarUrl: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
  * @summary Get notifications for current user
  */
 export const GetNotificationsResponse = zod.object({
