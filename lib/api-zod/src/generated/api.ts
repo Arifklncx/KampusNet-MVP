@@ -254,3 +254,41 @@ export const GetTrendingPostsResponseItem = zod.object({
   createdAt: zod.string(),
 });
 export const GetTrendingPostsResponse = zod.array(GetTrendingPostsResponseItem);
+
+/**
+ * @summary Get notifications for current user
+ */
+export const GetNotificationsResponse = zod.object({
+  notifications: zod.array(
+    zod.object({
+      id: zod.number(),
+      type: zod.string(),
+      actorName: zod.string(),
+      actorUniversity: zod.string(),
+      actorAvatarUrl: zod.string().nullish(),
+      postId: zod.number(),
+      postContent: zod.string(),
+      read: zod.boolean(),
+      createdAt: zod.string(),
+    }),
+  ),
+  unreadCount: zod.number(),
+});
+
+/**
+ * @summary Mark all notifications as read
+ */
+export const MarkAllNotificationsReadResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary Mark a single notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  notificationId: zod.coerce.number(),
+});
+
+export const MarkNotificationReadResponse = zod.object({
+  success: zod.boolean().optional(),
+});

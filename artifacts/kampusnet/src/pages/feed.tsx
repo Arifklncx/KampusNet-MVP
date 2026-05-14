@@ -13,11 +13,15 @@ import {
   useDeleteComment,
   useGetFeedStats,
   useGetTrendingPosts,
+  useGetNotifications,
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
   getGetPostsQueryKey,
   getGetFeedStatsQueryKey,
   getGetTrendingPostsQueryKey,
   getGetCommentsQueryKey,
   getGetMyProfileQueryKey,
+  getGetNotificationsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -68,6 +72,15 @@ function CommentIcon() {
   );
 }
 
+function BellIcon({ filled }: { filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" style={{ width: "18px", height: "18px" }}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
 function TrendingIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "15px", height: "15px" }}>
@@ -87,6 +100,121 @@ function ImageIcon() {
   );
 }
 
+/* ─── Notification Bell ─── */
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+
+  const { data } = useGetNotifications({
+    query: {
+      queryKey: getGetNotificationsQueryKey(),
+      refetchInterval: 30_000,
+    },
+  });
+
+  const markAll = useMarkAllNotificationsRead();
+  const markOne = useMarkNotificationRead();
+
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
+
+  async function handleMarkAll() {
+    await markAll.mutateAsync();
+    qc.invalidateQueries({ queryKey: getGetNotificationsQueryKey() });
+  }
+
+  async function handleMarkOne(id: number) {
+    await markOne.mutateAsync({ notificationId: id });
+    qc.invalidateQueries({ queryKey: getGetNotificationsQueryKey() });
+  }
+
+  function label(type: string, actorName: string) {
+    if (type === "like") return <><strong>{actorName}</strong> gönderini beğendi</>;
+    if (type === "comment") return <><strong>{actorName}</strong> gönderine yorum yaptı</>;
+    return <>{actorName} etkileşimde bulundu</>;
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        data-testid="button-notifications"
+        className={`relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+          open ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        }`}
+        aria-label="Bildirimler"
+      >
+        <BellIcon filled={unreadCount > 0} />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none px-[3px]">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-11 z-50 w-80 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <span className="font-semibold text-sm text-foreground">Bildirimler</span>
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAll}
+                  className="text-xs text-primary hover:underline font-medium"
+                  data-testid="button-mark-all-read"
+                >
+                  Tümünü okundu işaretle
+                </button>
+              )}
+            </div>
+
+            <div className="max-h-80 overflow-y-auto divide-y divide-border">
+              {notifications.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  Henüz bildirim yok
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => { if (!n.read) handleMarkOne(n.id); setOpen(false); }}
+                    data-testid={`notification-${n.id}`}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-muted/60 transition-colors ${
+                      !n.read ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5">
+                      <AvatarImage src={n.actorAvatarUrl ?? undefined} />
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
+                        {n.actorName.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground leading-snug">
+                        {label(n.type, n.actorName)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        "{n.postContent.slice(0, 60)}{n.postContent.length > 60 ? "…" : ""}"
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true, locale: tr })}
+                      </p>
+                    </div>
+                    {!n.read && (
+                      <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ─── Navbar ─── */
 function Navbar({ firstName, lastName, avatarUrl }: { firstName: string; lastName: string; avatarUrl?: string | null }) {
   const [, setLocation] = useLocation();
@@ -100,6 +228,7 @@ function Navbar({ firstName, lastName, avatarUrl }: { firstName: string; lastNam
           <span className="font-bold text-lg text-primary">Kampüsnet</span>
         </button>
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <button
             onClick={() => setLocation("/profile")}
             data-testid="link-profile"

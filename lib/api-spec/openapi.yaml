@@ -20,6 +20,8 @@ tags:
     description: Like operations
   - name: feed
     description: Feed and stats operations
+  - name: notifications
+    description: Notification operations
 paths:
   /healthz:
     get:
@@ -326,6 +328,65 @@ paths:
         "401":
           description: Unauthorized
 
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get notifications for current user
+      responses:
+        "200":
+          description: Notifications list with unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsResponse"
+        "401":
+          description: Unauthorized
+
+  /notifications/read-all:
+    put:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        "401":
+          description: Unauthorized
+
+  /notifications/{notificationId}/read:
+    put:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a single notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
 components:
   schemas:
     HealthStatus:
@@ -493,4 +554,38 @@ components:
         totalUniversities:
           type: integer
         postsToday:
+          type: integer
+
+    NotificationItem:
+      type: object
+      required: [id, type, actorName, actorUniversity, postId, postContent, read, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        actorName:
+          type: string
+        actorUniversity:
+          type: string
+        actorAvatarUrl:
+          type: ["string", "null"]
+        postId:
+          type: integer
+        postContent:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+
+    NotificationsResponse:
+      type: object
+      required: [notifications, unreadCount]
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationItem"
+        unreadCount:
           type: integer

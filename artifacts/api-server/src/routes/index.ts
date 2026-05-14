@@ -4,6 +4,7 @@ import usersRouter from "./users";
 import postsRouter from "./posts";
 import likesRouter from "./likes";
 import feedRouter from "./feed";
+import notificationsRouter from "./notifications";
 import { commentsRouter, singleCommentRouter } from "./comments";
 
 const router: IRouter = Router();
@@ -15,5 +16,6 @@ router.use("/posts/:postId/like", likesRouter);
 router.use("/posts/:postId/comments", commentsRouter);
 router.use("/comments", singleCommentRouter);
 router.use("/feed", feedRouter);
+router.use("/notifications", notificationsRouter);
 
 export default router;

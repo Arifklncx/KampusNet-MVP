@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, likesTable, postsTable } from "@workspace/db";
+import { db, likesTable, postsTable, notificationsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -38,6 +38,18 @@ router.post("/", requireAuth, async (req, res) => {
     .insert(likesTable)
     .values({ postId, userClerkId: userId! })
     .onConflictDoNothing();
+
+  if (post[0].authorClerkId !== userId) {
+    await db
+      .insert(notificationsTable)
+      .values({
+        recipientClerkId: post[0].authorClerkId,
+        actorClerkId: userId!,
+        type: "like",
+        postId,
+      })
+      .onConflictDoNothing();
+  }
 
   const likeCount = await getLikeCount(postId);
   res.json({ liked: true, likeCount });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, commentsTable, usersTable, postsTable } from "@workspace/db";
+import { db, commentsTable, usersTable, postsTable, notificationsTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { CreateCommentBody } from "@workspace/api-zod";
@@ -66,6 +66,12 @@ commentsRouter.post("/", requireAuth, async (req, res) => {
     return;
   }
 
+  const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
+  if (post.length === 0) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+
   const inserted = await db
     .insert(commentsTable)
     .values({
@@ -74,6 +80,15 @@ commentsRouter.post("/", requireAuth, async (req, res) => {
       authorClerkId: userId!,
     })
     .returning();
+
+  if (post[0].authorClerkId !== userId) {
+    await db.insert(notificationsTable).values({
+      recipientClerkId: post[0].authorClerkId,
+      actorClerkId: userId!,
+      type: "comment",
+      postId,
+    });
+  }
 
   const c = inserted[0];
   const author = await db

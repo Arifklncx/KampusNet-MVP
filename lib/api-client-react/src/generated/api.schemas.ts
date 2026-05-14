@@ -108,6 +108,24 @@ export interface FeedStats {
   postsToday: number;
 }
 
+export interface NotificationItem {
+  id: number;
+  type: string;
+  actorName: string;
+  actorUniversity: string;
+  /** @nullable */
+  actorAvatarUrl?: string | null;
+  postId: number;
+  postContent: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationItem[];
+  unreadCount: number;
+}
+
 export type GetPostsParams = {
   /**
    * Filter posts by university
@@ -124,3 +142,11 @@ export const GetPostsFilter = {
   all: "all",
   my_university: "my_university",
 } as const;
+
+export type MarkAllNotificationsRead200 = {
+  success?: boolean;
+};
+
+export type MarkNotificationRead200 = {
+  success?: boolean;
+};
