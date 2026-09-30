@@ -9,7 +9,7 @@ const commentsRouter = Router({ mergeParams: true });
 const singleCommentRouter = Router();
 
 commentsRouter.get("/", async (req, res) => {
-  const postId = Number(req.params.postId);
+  const postId = Number((req.params as Record<string, string>).postId);
   if (isNaN(postId)) {
     res.status(400).json({ error: "Invalid post ID" });
     return;
@@ -53,7 +53,7 @@ commentsRouter.get("/", async (req, res) => {
 
 commentsRouter.post("/", requireAuth, async (req, res) => {
   const { userId } = getAuth(req);
-  const postId = Number(req.params.postId);
+  const postId = Number((req.params as Record<string, string>).postId);
 
   if (isNaN(postId)) {
     res.status(400).json({ error: "Invalid post ID" });

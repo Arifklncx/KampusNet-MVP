@@ -146,6 +146,41 @@ export interface NotificationsResponse {
   unreadCount: number;
 }
 
+export interface DirectMessage {
+  id: number;
+  senderId: string;
+  recipientId: string;
+  content: string;
+  /** @nullable */
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface DirectMessageInput {
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  content: string;
+}
+
+export interface Conversation {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  university: string;
+  department: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+export interface SuccessResponse {
+  success: boolean;
+}
+
 export type GetPostsParams = {
   /**
    * Filter posts by university

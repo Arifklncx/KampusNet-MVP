@@ -25,6 +25,7 @@ import {
   getGetMyProfileQueryKey,
   getGetNotificationsQueryKey,
   getGetTrendingHashtagsQueryKey,
+  getSearchQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
+import { MessageCircle } from "lucide-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -148,7 +150,7 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
 
   const { data, isFetching } = useSearch(
     { q: debouncedQ },
-    { query: { enabled, staleTime: 10_000 } }
+    { query: { queryKey: getSearchQueryKey({ q: debouncedQ }), enabled, staleTime: 10_000 } }
   );
 
   const users = data?.users ?? [];
@@ -274,8 +276,8 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
                           </div>
                           <p className="text-sm text-foreground/90 leading-snug line-clamp-2 break-words">{p.content}</p>
                           <div className="flex items-center gap-3 mt-1">
-                            <span className="text-xs text-muted-foreground">❤️ {p.likeCount}</span>
-                            <span className="text-xs text-muted-foreground">💬 {p.commentCount}</span>
+                            <span className="text-xs text-muted-foreground">{p.likeCount} beğeni</span>
+                            <span className="text-xs text-muted-foreground">{p.commentCount} yorum</span>
                             <span className="text-xs text-muted-foreground">
                               {formatDistanceToNow(new Date(p.createdAt), { addSuffix: true, locale: tr })}
                             </span>
@@ -432,6 +434,14 @@ function Navbar({ firstName, lastName, avatarUrl }: { firstName: string; lastNam
               aria-label="Ara"
             >
               <SearchIcon />
+            </button>
+            <button
+              onClick={() => setLocation("/messages")}
+              data-testid="link-messages"
+              className="relative flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
+              aria-label="Mesajlar"
+            >
+              <MessageCircle className="w-[18px] h-[18px]" />
             </button>
             <NotificationBell />
             <button
@@ -1097,7 +1107,7 @@ export default function Feed() {
                     <div key={p.id} className="flex-shrink-0 w-44 bg-card border border-border rounded-xl p-3 hover:border-primary/30 transition-colors cursor-default">
                       <p className="text-xs text-foreground line-clamp-2 mb-2 leading-relaxed">{p.content}</p>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-red-500 font-semibold">♥ {p.likeCount}</span>
+                        <span className="text-xs text-muted-foreground font-semibold">{p.likeCount} beğeni</span>
                         <span className="text-xs text-muted-foreground">· {p.authorUniversity.split(" ")[0]}</span>
                       </div>
                     </div>

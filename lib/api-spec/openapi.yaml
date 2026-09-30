@@ -22,6 +22,8 @@ tags:
     description: Feed and stats operations
   - name: notifications
     description: Notification operations
+  - name: messages
+    description: Private student messaging
 paths:
   /healthz:
     get:
@@ -146,6 +148,31 @@ paths:
                 $ref: "#/components/schemas/Post"
         "401":
           description: Unauthorized
+
+  /posts/by-user/{userId}:
+    get:
+      operationId: getUserPosts
+      tags: [posts]
+      summary: Get all posts by a student
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Student posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
 
   /posts/{postId}:
     get:
@@ -368,6 +395,100 @@ paths:
           description: Missing query
         "401":
           description: Unauthorized
+
+  /messages/conversations:
+    get:
+      operationId: getConversations
+      tags: [messages]
+      summary: Get conversations for the current student
+      responses:
+        "200":
+          description: Conversations ordered by most recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+        "401":
+          description: Unauthorized
+
+  /messages/{userId}:
+    get:
+      operationId: getConversationMessages
+      tags: [messages]
+      summary: Get messages exchanged with a student
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages ordered from oldest to newest
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DirectMessage"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Student not found
+    post:
+      operationId: sendDirectMessage
+      tags: [messages]
+      summary: Send a private message to a student
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DirectMessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectMessage"
+        "400":
+          description: Invalid message
+        "401":
+          description: Unauthorized
+        "404":
+          description: Student not found
+
+  /messages/{userId}/read:
+    put:
+      operationId: markConversationRead
+      tags: [messages]
+      summary: Mark messages from a student as read
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversation marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Student not found
 
   /notifications:
     get:
@@ -669,3 +790,62 @@ components:
             $ref: "#/components/schemas/NotificationItem"
         unreadCount:
           type: integer
+
+    DirectMessage:
+      type: object
+      required: [id, senderId, recipientId, content, readAt, createdAt]
+      properties:
+        id:
+          type: integer
+        senderId:
+          type: string
+        recipientId:
+          type: string
+        content:
+          type: string
+        readAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    DirectMessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+
+    Conversation:
+      type: object
+      required: [userId, firstName, lastName, university, department, lastMessage, lastMessageAt, unreadCount]
+      properties:
+        userId:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        university:
+          type: string
+        department:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+        lastMessage:
+          type: string
+        lastMessageAt:
+          type: string
+          format: date-time
+        unreadCount:
+          type: integer
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean

@@ -8,6 +8,7 @@ import {
   GetPostParams,
   DeletePostParams,
   CreatePostBody,
+  GetUserProfileParams,
 } from "@workspace/api-zod";
 
 const router = Router();
@@ -150,6 +151,32 @@ router.post("/", requireAuth, async (req, res) => {
   const post = inserted[0];
   const enriched = await enrichPost(post, userId!);
   res.status(201).json(enriched);
+});
+
+router.get("/by-user/:userId", requireAuth, async (req, res): Promise<void> => {
+  const parsed = GetUserProfileParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid student ID" });
+    return;
+  }
+
+  const [author] = await db
+    .select({ clerkId: usersTable.clerkId })
+    .from(usersTable)
+    .where(eq(usersTable.clerkId, parsed.data.userId))
+    .limit(1);
+  if (!author) {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  const posts = await db
+    .select()
+    .from(postsTable)
+    .where(eq(postsTable.authorClerkId, parsed.data.userId))
+    .orderBy(desc(postsTable.createdAt));
+  const enriched = await Promise.all(posts.map((post) => enrichPost(post, getAuth(req).userId ?? null)));
+  res.json(enriched);
 });
 
 router.get("/:postId", async (req, res) => {

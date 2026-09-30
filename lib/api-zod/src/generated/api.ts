@@ -135,6 +135,29 @@ export const CreatePostBody = zod.object({
 });
 
 /**
+ * @summary Get all posts by a student
+ */
+export const GetUserPostsParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+export const GetUserPostsResponseItem = zod.object({
+  id: zod.number(),
+  content: zod.string(),
+  imageUrl: zod.string().nullish(),
+  authorId: zod.string(),
+  authorName: zod.string(),
+  authorUniversity: zod.string(),
+  authorDepartment: zod.string().optional(),
+  authorAvatarUrl: zod.string().nullish(),
+  likeCount: zod.number(),
+  commentCount: zod.number(),
+  liked: zod.boolean(),
+  createdAt: zod.string(),
+});
+export const GetUserPostsResponse = zod.array(GetUserPostsResponseItem);
+
+/**
  * @summary Get a single post
  */
 export const GetPostParams = zod.object({
@@ -301,6 +324,65 @@ export const SearchResponse = zod.object({
       avatarUrl: zod.string().nullish(),
     }),
   ),
+});
+
+/**
+ * @summary Get conversations for the current student
+ */
+export const GetConversationsResponseItem = zod.object({
+  userId: zod.string(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  university: zod.string(),
+  department: zod.string(),
+  avatarUrl: zod.string().nullish(),
+  lastMessage: zod.string(),
+  lastMessageAt: zod.coerce.date(),
+  unreadCount: zod.number(),
+});
+export const GetConversationsResponse = zod.array(GetConversationsResponseItem);
+
+/**
+ * @summary Get messages exchanged with a student
+ */
+export const GetConversationMessagesParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+export const GetConversationMessagesResponseItem = zod.object({
+  id: zod.number(),
+  senderId: zod.string(),
+  recipientId: zod.string(),
+  content: zod.string(),
+  readAt: zod.coerce.date().nullable(),
+  createdAt: zod.coerce.date(),
+});
+export const GetConversationMessagesResponse = zod.array(
+  GetConversationMessagesResponseItem,
+);
+
+/**
+ * @summary Send a private message to a student
+ */
+export const SendDirectMessageParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+export const sendDirectMessageBodyContentMax = 2000;
+
+export const SendDirectMessageBody = zod.object({
+  content: zod.string().min(1).max(sendDirectMessageBodyContentMax),
+});
+
+/**
+ * @summary Mark messages from a student as read
+ */
+export const MarkConversationReadParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+export const MarkConversationReadResponse = zod.object({
+  success: zod.boolean(),
 });
 
 /**

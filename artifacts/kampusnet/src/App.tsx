@@ -11,6 +11,7 @@ import Feed from "@/pages/feed";
 import Onboarding from "@/pages/onboarding";
 import Profile from "@/pages/profile";
 import UserProfile from "@/pages/user-profile";
+import Messages from "@/pages/messages";
 import { useGetMyProfile, getGetMyProfileQueryKey } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
@@ -260,6 +261,12 @@ function ClerkProviderWithRoutes() {
           </Route>
           <Route path="/profile/:userId">
             <AuthGuard component={UserProfile} requireProfile={true} />
+          </Route>
+          <Route path="/messages">
+            <AuthGuard component={Messages} requireProfile={true} />
+          </Route>
+          <Route path="/messages/:userId">
+            <AuthGuard component={Messages} requireProfile={true} />
           </Route>
           <Route component={NotFound} />
         </Switch>

@@ -7,6 +7,7 @@ import feedRouter from "./feed";
 import notificationsRouter from "./notifications";
 import searchRouter from "./search";
 import { commentsRouter, singleCommentRouter } from "./comments";
+import messagesRouter from "./messages";
 
 const router: IRouter = Router();
 
@@ -19,5 +20,6 @@ router.use("/comments", singleCommentRouter);
 router.use("/feed", feedRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/search", searchRouter);
+router.use("/messages", messagesRouter);
 
 export default router;

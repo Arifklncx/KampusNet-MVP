@@ -8,6 +8,9 @@
 
 export * from "./comment";
 export * from "./commentInput";
+export * from "./conversation";
+export * from "./directMessage";
+export * from "./directMessageInput";
 export * from "./feedStats";
 export * from "./getPostsFilter";
 export * from "./getPostsParams";
@@ -22,6 +25,7 @@ export * from "./postInput";
 export * from "./postsPage";
 export * from "./searchParams";
 export * from "./searchResult";
+export * from "./successResponse";
 export * from "./trendingHashtag";
 export * from "./userProfile";
 export * from "./userProfileInput";
