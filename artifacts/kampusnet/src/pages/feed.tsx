@@ -645,8 +645,10 @@ function CreatePost() {
 }
 
 /* ─── Comments ─── */
+const MAX_COMMENT_LENGTH = 280;
+
 function PostComments({ postId, currentUserId }: { postId: number; currentUserId: string }) {
-  const { data: comments, isLoading } = useGetComments(postId, {
+  const { data: comments, isLoading, isError, refetch } = useGetComments(postId, {
     query: { queryKey: getGetCommentsQueryKey(postId) },
   });
   const createComment = useCreateComment();
@@ -655,25 +657,61 @@ function PostComments({ postId, currentUserId }: { postId: number; currentUserId
   const [text, setText] = useState("");
   const { toast } = useToast();
 
+  function updateFeedCommentCount(delta: number) {
+    qc.setQueriesData<{
+      posts: Array<{ id: number; commentCount: number }>;
+      total: number;
+    }>({ queryKey: getGetPostsQueryKey() }, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        posts: old.posts.map((post) =>
+          post.id === postId
+            ? { ...post, commentCount: Math.max(0, post.commentCount + delta) }
+            : post,
+        ),
+      };
+    });
+  }
+
   async function submit() {
-    if (!text.trim()) return;
+    if (!text.trim() || createComment.isPending) return;
     try {
       await createComment.mutateAsync({ postId, data: { content: text.trim() } });
       setText("");
-      qc.invalidateQueries({ queryKey: getGetCommentsQueryKey(postId) });
+      updateFeedCommentCount(1);
+      await qc.invalidateQueries({ queryKey: getGetCommentsQueryKey(postId) });
     } catch {
       toast({ title: "Hata", description: "Yorum gönderilemedi.", variant: "destructive" });
     }
   }
 
+  async function removeComment(commentId: number) {
+    try {
+      await deleteComment.mutateAsync({ commentId });
+      updateFeedCommentCount(-1);
+      await qc.invalidateQueries({ queryKey: getGetCommentsQueryKey(postId) });
+    } catch {
+      toast({ title: "Hata", description: "Yorum silinemedi.", variant: "destructive" });
+    }
+  }
+
   return (
-    <div className="mt-3 pt-3 border-t border-border space-y-3">
+    <div id={`comments-${postId}`} className="mt-3 space-y-3 border-t border-border pt-3" data-testid={`comments-section-${postId}`}>
+      <h3 className="text-xs font-semibold text-muted-foreground">Yorumlar</h3>
       {isLoading ? (
-        <div className="h-8 flex items-center">
+        <div className="flex h-8 items-center" aria-label="Yorumlar yükleniyor">
           <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : (
-        comments?.map((c) => (
+      ) : isError ? (
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm" data-testid={`comments-error-${postId}`}>
+          <p className="text-foreground">Yorumlar yüklenemedi.</p>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => refetch()}>
+            Yeniden dene
+          </Button>
+        </div>
+      ) : comments?.length ? (
+        comments.map((c) => (
           <div key={c.id} className="flex gap-2.5 animate-fade-in-up" data-testid={`comment-${c.id}`}>
             <Avatar className="w-7 h-7 flex-shrink-0">
               <AvatarImage src={c.authorAvatarUrl ?? undefined} />
@@ -690,12 +728,10 @@ function PostComments({ postId, currentUserId }: { postId: number; currentUserId
             </div>
             {c.authorId === currentUserId && (
               <button
-                onClick={() => {
-                  deleteComment.mutateAsync({ commentId: c.id }).then(() => {
-                    qc.invalidateQueries({ queryKey: getGetCommentsQueryKey(postId) });
-                  });
-                }}
-                className="text-muted-foreground hover:text-destructive transition-colors text-xs self-start pt-2"
+                type="button"
+                onClick={() => void removeComment(c.id)}
+                disabled={deleteComment.isPending}
+                className="text-muted-foreground hover:text-destructive transition-colors text-xs self-start pt-2 disabled:opacity-50"
                 data-testid={`button-delete-comment-${c.id}`}
               >
                 Sil
@@ -703,11 +739,16 @@ function PostComments({ postId, currentUserId }: { postId: number; currentUserId
             )}
           </div>
         ))
+      ) : (
+        <p className="rounded-lg bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground" data-testid={`empty-comments-${postId}`}>
+          Henüz yorum yok. İlk yanıtı sen yaz.
+        </p>
       )}
-      <div className="flex gap-2 pt-1">
+      <div className="flex items-end gap-2 pt-1">
         <Textarea
           rows={1}
-          placeholder="Yorum yaz… (Enter ile gönder)"
+          maxLength={MAX_COMMENT_LENGTH}
+          placeholder="Kısa bir yorum yaz…"
           value={text}
           onChange={(e) => setText(e.target.value)}
           className="resize-none text-sm min-h-[36px] py-2 bg-muted border-0 focus-visible:ring-1"
@@ -719,15 +760,17 @@ function PostComments({ postId, currentUserId }: { postId: number; currentUserId
           }}
           data-testid={`textarea-comment-${postId}`}
         />
-        <Button
-          size="sm"
-          onClick={submit}
-          disabled={createComment.isPending || !text.trim()}
-          className="self-end"
-          data-testid={`button-submit-comment-${postId}`}
-        >
-          Gönder
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-[10px] text-muted-foreground">{text.length}/{MAX_COMMENT_LENGTH}</span>
+          <Button
+            size="sm"
+            onClick={() => void submit()}
+            disabled={createComment.isPending || !text.trim()}
+            data-testid={`button-submit-comment-${postId}`}
+          >
+            Gönder
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -829,7 +872,10 @@ function PostCard({
           {/* Action Row */}
           <div className="flex items-center gap-1 mt-3">
             <button
+              type="button"
               onClick={handleLike}
+              aria-pressed={post.liked}
+              aria-label={`${post.liked ? "Beğeniyi kaldır" : "Beğen"} · ${post.likeCount}`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 post.liked
                   ? "text-red-500 bg-red-50 hover:bg-red-100"
@@ -840,10 +886,14 @@ function PostCard({
               <span className={likeAnim ? "animate-heart" : ""}>
                 <HeartIcon filled={post.liked} />
               </span>
+              <span>{post.liked ? "Beğenildi" : "Beğen"}</span>
               <span data-testid={`like-count-${post.id}`}>{post.likeCount}</span>
             </button>
             <button
+              type="button"
               onClick={() => setShowComments((v) => !v)}
+              aria-expanded={showComments}
+              aria-controls={`comments-${post.id}`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 showComments
                   ? "text-primary bg-primary/10"

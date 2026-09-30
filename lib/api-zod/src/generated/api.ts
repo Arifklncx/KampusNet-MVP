@@ -236,7 +236,7 @@ export const CreateCommentParams = zod.object({
   postId: zod.coerce.number(),
 });
 
-export const createCommentBodyContentMax = 1000;
+export const createCommentBodyContentMax = 280;
 
 export const CreateCommentBody = zod.object({
   content: zod.string().min(1).max(createCommentBodyContentMax),

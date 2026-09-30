@@ -91,7 +91,7 @@ export interface Comment {
 export interface CommentInput {
   /**
    * @minLength 1
-   * @maxLength 1000
+   * @maxLength 280
    */
   content: string;
 }

@@ -694,7 +694,7 @@ components:
         content:
           type: string
           minLength: 1
-          maxLength: 1000
+          maxLength: 280
 
     LikeResult:
       type: object
