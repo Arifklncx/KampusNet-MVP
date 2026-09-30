@@ -42,6 +42,25 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+const UNIVERSITY_EMAIL_ERROR =
+  "Sadece üniversite e-posta adresinizle kayıt olabilirsiniz.";
+
+function getApiErrorMessage(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return undefined;
+  }
+
+  const data = error.data;
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "error" in data &&
+    typeof data.error === "string"
+  ) {
+    return data.error;
+  }
+  return undefined;
+}
 
 const TURKISH_UNIVERSITIES = [
   "Boğaziçi Üniversitesi",
@@ -219,7 +238,11 @@ export default function Onboarding() {
       await qc.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
       toast({ title: "Profil oluşturuldu!", description: "Kampüsnet'e hoş geldin 🎉" });
       setLocation("/feed");
-    } catch {
+    } catch (error) {
+      if (getApiErrorMessage(error) === UNIVERSITY_EMAIL_ERROR) {
+        toast({ title: UNIVERSITY_EMAIL_ERROR, variant: "destructive" });
+        return;
+      }
       toast({ title: "Hata", description: "Profil oluşturulamadı. Lütfen tekrar dene.", variant: "destructive" });
     }
   }

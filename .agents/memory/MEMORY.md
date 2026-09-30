@@ -1,0 +1,1 @@
+- [Campus email signup gate](campus-email-signup-gate.md) — enforce `.edu.tr` before Clerk signup and from Clerk’s primary email on the server; fail closed.

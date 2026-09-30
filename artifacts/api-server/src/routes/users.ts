@@ -9,6 +9,14 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
+const UNIVERSITY_EMAIL_ERROR =
+  "Sadece üniversite e-posta adresinizle kayıt olabilirsiniz.";
+const UNIVERSITY_EMAIL_PATTERN =
+  /^[^\s@]+@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+edu\.tr$/i;
+
+function isUniversityEmail(email: string): boolean {
+  return UNIVERSITY_EMAIL_PATTERN.test(email.trim());
+}
 
 async function getPostCount(clerkId: string): Promise<number> {
   const [row] = await db
@@ -59,13 +67,13 @@ router.put("/me", requireAuth, async (req, res) => {
 
   try {
     const clerkUser = await (clerkClient?.users?.getUser(userId!) ?? Promise.resolve(null));
-    email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? "";
-  } catch {
-    email = `${userId}@unknown.edu.tr`;
+    email = clerkUser?.primaryEmailAddress?.emailAddress ?? "";
+  } catch (error) {
+    req.log.warn({ err: error }, "Could not retrieve the signed-in user's email from Clerk");
   }
 
-  if (email && !email.endsWith(".edu.tr")) {
-    res.status(400).json({ error: "Only .edu.tr email addresses are allowed" });
+  if (!isUniversityEmail(email)) {
+    res.status(400).json({ error: UNIVERSITY_EMAIL_ERROR });
     return;
   }
 
@@ -81,7 +89,7 @@ router.put("/me", requireAuth, async (req, res) => {
       .insert(usersTable)
       .values({
         clerkId: userId!,
-        email: email || `${userId}@unknown.edu.tr`,
+        email,
         firstName,
         lastName,
         university,
